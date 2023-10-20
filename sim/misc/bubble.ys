@@ -1,0 +1,65 @@
+# 吕杭州 2200013126
+    .pos 0
+    irmovq stack, %rsp
+    call main
+    halt
+
+    .align 8
+Array:
+    .quad 0xbca
+    .quad 0xcba
+    .quad 0xacb
+    .quad 0xcab
+    .quad 0xabc
+    .quad 0xbac
+
+main:
+    irmovq Array, %rdi
+    irmovq $6, %rsi     # 第二个参数count in %rsi = 6
+    call bubble_sort
+    ret
+
+bubble_sort:
+    # 我们根据x86-64的代码来写
+    xorq %rdx, %rdx     # 我们先来计算 last = data + count -1
+    addq %rsi, %rdx     # %rdx = %rsi
+    addq %rsi, %rdx     # %rdx = 2 * %rsi
+    addq %rdx, %rdx     # %rdx = 4 * %rsi
+    addq %rdx, %rdx     # %rdx = 8 * %rsi
+    irmovq $8, %r13
+    subq %r13, %rdx       # %rdx = 8 * %rsi - 8
+    addq %rdi, %rdx     # %rdx = %rdi + 8 * %rsi - 8
+    rrmovq %rdx, %rsi
+    jmp loop1_test
+
+loop2_inc:
+    addq %r13, %rax
+
+loop2:
+    rrmovq %rax, %rdx
+    subq %rsi, %rdx
+    jge loop1_inc           # 当%rax >= %rsi 的时候，也就是data >= last的时候
+    mrmovq 8(%rax), %rdx    # %rdx = *(i + 1)
+    mrmovq (%rax), %rcx     # %rcx = * i
+    rrmovq %rdx, %r8
+    subq %rcx, %r8
+    jge loop2_inc           # 当*(i + 1) >= *i 时候，不干事
+    rmmovq %rcx, 8(%rax)
+    rmmovq %rdx, (%rax)
+    jmp loop2_inc
+
+loop1_inc:
+    subq %r13, %rsi
+
+loop1_test:
+    rrmovq %rsi, %rcx
+    subq %rdi, %rcx
+    jle finish
+    rrmovq %rdi, %rax
+    jmp loop2
+
+finish:
+    ret
+
+    .pos 0x200
+stack:

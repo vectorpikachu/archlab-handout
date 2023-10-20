@@ -1,0 +1,44 @@
+# 吕杭州 2200013126
+# 这里是根据书上的P252 图4-7写出来的
+# 首先在地址 0x0 开始
+    .pos 0
+    irmovq stack, %rsp  # 初始化栈指针
+    call main           # 执行主函数
+    halt
+
+    .align 8
+ele1:
+    .quad 0x00a
+    .quad ele2
+ele2:
+    .quad 0x0b0
+    .quad ele3
+ele3:
+    .quad 0xc00
+    .quad 0
+
+# 开始主函数
+main:
+    irmovq ele1, %rdi   # 把链表头传入参数中
+    call sum_list
+    ret
+
+# 开始sum_list函数
+sum_list:
+    xorq %rax, %rax     # 我们让寄存器%rax保存sum，且让他初始等于0
+    andq %rdi, %rdi     # 设置条件码
+    jne loop
+    ret
+
+# 下面是要开始的一个循环
+loop:
+    mrmovq (%rdi), %r10 # 读出来val的值
+    addq %r10, %rax
+    mrmovq 8(%rdi), %rsi # 下一个的地址
+    rrmovq %rsi, %rdi
+    andq %rdi, %rdi
+    jne loop
+    ret
+
+    .pos 0x200
+stack:

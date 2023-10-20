@@ -1,0 +1,65 @@
+                            | # 吕杭州 2200013126
+0x000:                      |     .pos 0
+0x000: 30f40002000000000000 |     irmovq stack, %rsp
+0x00a: 804800000000000000   |     call main
+0x013: 00                   |     halt
+                            | 
+0x018:                      |     .align 8
+0x018:                      | Array:
+0x018: ca0b000000000000     |     .quad 0xbca
+0x020: ba0c000000000000     |     .quad 0xcba
+0x028: cb0a000000000000     |     .quad 0xacb
+0x030: ab0c000000000000     |     .quad 0xcab
+0x038: bc0a000000000000     |     .quad 0xabc
+0x040: ac0b000000000000     |     .quad 0xbac
+                            | 
+0x048:                      | main:
+0x048: 30f71800000000000000 |     irmovq Array, %rdi
+0x052: 30f60600000000000000 |     irmovq $6, %rsi     # 第二个参数count in %rsi = 6
+0x05c: 806600000000000000   |     call bubble_sort
+0x065: 90                   |     ret
+                            | 
+0x066:                      | bubble_sort:
+                            |     # 我们根据x86-64的代码来写
+0x066: 6322                 |     xorq %rdx, %rdx     # 我们先来计算 last = data + count -1
+0x068: 6062                 |     addq %rsi, %rdx     # %rdx = %rsi
+0x06a: 6062                 |     addq %rsi, %rdx     # %rdx = 2 * %rsi
+0x06c: 6022                 |     addq %rdx, %rdx     # %rdx = 4 * %rsi
+0x06e: 6022                 |     addq %rdx, %rdx     # %rdx = 8 * %rsi
+0x070: 30fd0800000000000000 |     irmovq $8, %r13
+0x07a: 61d2                 |     subq %r13, %rdx       # %rdx = 8 * %rsi - 8
+0x07c: 6072                 |     addq %rdi, %rdx     # %rdx = %rdi + 8 * %rsi - 8
+0x07e: 2026                 |     rrmovq %rdx, %rsi
+0x080: 70d800000000000000   |     jmp loop1_test
+                            | 
+0x089:                      | loop2_inc:
+0x089: 60d0                 |     addq %r13, %rax
+                            | 
+0x08b:                      | loop2:
+0x08b: 2002                 |     rrmovq %rax, %rdx
+0x08d: 6162                 |     subq %rsi, %rdx
+0x08f: 75d600000000000000   |     jge loop1_inc           # 当%rax >= %rsi 的时候，也就是data >= last的时候
+0x098: 50200800000000000000 |     mrmovq 8(%rax), %rdx    # %rdx = *(i + 1)
+0x0a2: 50100000000000000000 |     mrmovq (%rax), %rcx     # %rcx = * i
+0x0ac: 2028                 |     rrmovq %rdx, %r8
+0x0ae: 6118                 |     subq %rcx, %r8
+0x0b0: 758900000000000000   |     jge loop2_inc           # 当*(i + 1) >= *i 时候，不干事
+0x0b9: 40100800000000000000 |     rmmovq %rcx, 8(%rax)
+0x0c3: 40200000000000000000 |     rmmovq %rdx, (%rax)
+0x0cd: 708900000000000000   |     jmp loop2_inc
+                            | 
+0x0d6:                      | loop1_inc:
+0x0d6: 61d6                 |     subq %r13, %rsi
+                            | 
+0x0d8:                      | loop1_test:
+0x0d8: 2061                 |     rrmovq %rsi, %rcx
+0x0da: 6171                 |     subq %rdi, %rcx
+0x0dc: 71f000000000000000   |     jle finish
+0x0e5: 2070                 |     rrmovq %rdi, %rax
+0x0e7: 708b00000000000000   |     jmp loop2
+                            | 
+0x0f0:                      | finish:
+0x0f0: 90                   |     ret
+                            | 
+0x200:                      |     .pos 0x200
+0x200:                      | stack:

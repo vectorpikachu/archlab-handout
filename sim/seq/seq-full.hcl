@@ -1,4 +1,19 @@
 # 吕杭州 2200013126
+
+# iaddq V,rB
+# fetch: icode:ifun = M1[PC], rA:rB = M1[PC+1], valC = M8[PC+2], valP = PC+10
+# decode: valB = R[rB]
+# execute: valE = valB+valC, set CC
+# write-back: R[rB] = valE
+# PC update: PC = valP
+
+# jm rB,V
+# fetch: icode:ifun = M1[PC], rA,rB = M1[PC+1], valC = M8[PC+2], valP = PC+10
+# decode: valB = R[rB]
+# execute: valE = valB+valC
+# memory: valM = M8[valE]
+# PC update: PC = valM
+
 #/* $begin seq-all-hcl */
 ####################################################################
 #  HCL Description of Control for Single Cycle Y86-64 Processor SEQ   #

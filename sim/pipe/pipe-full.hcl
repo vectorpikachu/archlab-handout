@@ -136,6 +136,7 @@ wordsig W_valM  'mem_wb_curr->valm'	# Memory M value
 ## What address should instruction be fetched at
 word f_pc = [
 	# Mispredicted branch.  Fetch at incremented PC
+	# 在经过Execute阶段后，会设置条件码，条件码e_Cnd会进入Memory寄存器里面成为M_cnd
 	M_icode == IJXX && !M_Cnd : M_valA;
 	# Completion of RET instruction
 	W_icode == IRET : W_valM;
@@ -158,7 +159,8 @@ word f_ifun = [
 # Is instruction valid?
 bool instr_valid = f_icode in 
 	{ INOP, IHALT, IRRMOVQ, IIRMOVQ, IRMMOVQ, IMRMOVQ,
-	  IOPQ, IJXX, ICALL, IRET, IPUSHQ, IPOPQ };
+	  IOPQ, IJXX, ICALL, IRET, IPUSHQ, IPOPQ, IIADDQ };
+	# 这里IIADDQ也是合法的指令
 
 # Determine status code for fetched instruction
 word f_stat = [
@@ -171,17 +173,21 @@ word f_stat = [
 # Does fetched instruction require a regid byte?
 bool need_regids =
 	f_icode in { IRRMOVQ, IOPQ, IPUSHQ, IPOPQ, 
-		     IIRMOVQ, IRMMOVQ, IMRMOVQ };
+		     IIRMOVQ, IRMMOVQ, IMRMOVQ, IIADDQ };
+			# 这里IIADDQ也是需要寄存器的
 
 # Does fetched instruction require a constant word?
 bool need_valC =
-	f_icode in { IIRMOVQ, IRMMOVQ, IMRMOVQ, IJXX, ICALL };
+	f_icode in { IIRMOVQ, IRMMOVQ, IMRMOVQ, IJXX, ICALL, IIADDQ };
+			# 这里IIADDQ也是需要立即数的
 
 # Predict next value of PC
 word f_predPC = [
 	f_icode in { IJXX, ICALL } : f_valC;
 	1 : f_valP;
 ];
+# 指令是IJXX或者ICALL的时候，PC的值是立即数
+# 其他情况下，PC的值是预测的指令地址
 
 ################ Decode Stage ######################################
 
@@ -195,17 +201,19 @@ word d_srcA = [
 
 ## What register should be used as the B source?
 word d_srcB = [
-	D_icode in { IOPQ, IRMMOVQ, IMRMOVQ  } : D_rB;
+	D_icode in { IOPQ, IRMMOVQ, IMRMOVQ, IIADDQ  } : D_rB;
 	D_icode in { IPUSHQ, IPOPQ, ICALL, IRET } : RRSP;
 	1 : RNONE;  # Don't need register
 ];
+# IIADDQ指令 iaddq V,rB ，所以这里的d_srcB是需要寄存器的
 
 ## What register should be used as the E destination?
 word d_dstE = [
-	D_icode in { IRRMOVQ, IIRMOVQ, IOPQ} : D_rB;
+	D_icode in { IRRMOVQ, IIRMOVQ, IOPQ, IIADDQ} : D_rB;
 	D_icode in { IPUSHQ, IPOPQ, ICALL, IRET } : RRSP;
 	1 : RNONE;  # Don't write any register
 ];
+# IIADDQ指令 iaddq V,rB ，所以这里的d_dstE是需要寄存器的
 
 ## What register should be used as the M destination?
 word d_dstM = [
@@ -239,30 +247,34 @@ word d_valB = [
 ## Select input A to ALU
 word aluA = [
 	E_icode in { IRRMOVQ, IOPQ } : E_valA;
-	E_icode in { IIRMOVQ, IRMMOVQ, IMRMOVQ } : E_valC;
+	E_icode in { IIRMOVQ, IRMMOVQ, IMRMOVQ, IIADDQ } : E_valC;
 	E_icode in { ICALL, IPUSHQ } : -8;
 	E_icode in { IRET, IPOPQ } : 8;
 	# Other instructions don't need ALU
 ];
+# IIADDQ指令 iaddq V,rB ，所以这里的aluA是需要立即数valC的
 
 ## Select input B to ALU
 word aluB = [
 	E_icode in { IRMMOVQ, IMRMOVQ, IOPQ, ICALL, 
-		     IPUSHQ, IRET, IPOPQ } : E_valB;
+		     IPUSHQ, IRET, IPOPQ, IIADDQ } : E_valB;
 	E_icode in { IRRMOVQ, IIRMOVQ } : 0;
 	# Other instructions don't need ALU
 ];
+# IIADDQ指令 iaddq V,rB ，所以这里的aluB是需要寄存器valB的
 
 ## Set the ALU function
 word alufun = [
 	E_icode == IOPQ : E_ifun;
 	1 : ALUADD;
 ];
+# IIADDQ指令 iaddq V,rB ，也是默认为加法的
 
 ## Should the condition codes be updated?
-bool set_cc = E_icode == IOPQ &&
+bool set_cc = (E_icode == IOPQ || E_icode == IIADDQ) &&
 	# State changes only during normal operation
 	!m_stat in { SADR, SINS, SHLT } && !W_stat in { SADR, SINS, SHLT };
+# IIADDQ指令 iaddq V,rB ，也是需要更新条件码的
 
 ## Generate valA in execute stage
 word e_valA = E_valA;    # Pass valA through stage

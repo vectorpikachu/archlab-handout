@@ -1,3 +1,9 @@
+
+# 我的目的就是把iaddq这个指令加入到Y86-64的指令集中
+# 然后在ncopy.ys中使用iaddq指令，好像确实可以的
+# 我们直接把M阶段读出来的东西交给E阶段就好了
+# 因为一般不是中间要等待M阶段，我们可以直接把这个周期里读出的M给E，这样IRMMOVQ就可以直接读出来了
+
 #/* $begin pipe-all-hcl */
 ####################################################################
 #    HCL Description of Control for Pipelined Y86-64 Processor     #
@@ -277,7 +283,11 @@ bool set_cc = (E_icode == IOPQ || E_icode == IIADDQ) &&
 # IIADDQ指令 iaddq V,rB ，也是需要更新条件码的
 
 ## Generate valA in execute stage
-word e_valA = E_valA;    # Pass valA through stage
+# word e_valA = E_valA;    # Pass valA through stage
+word e_valA = [
+	E_icode == IRMMOVQ && E_srcA == M_dstM: m_valM; # 因为IRMMOVQ上面的指令如果目的地是我指令的缘地质， 那么我直接把他读出来的值给我就好了，这样就不用等待了
+	1: E_valA;
+];
 
 ## Set dstE to RNONE in event of not-taken conditional move
 word e_dstE = [
@@ -334,25 +344,27 @@ bool F_bubble = 0;
 bool F_stall =
 	# Conditions for a load/use hazard
 	E_icode in { IMRMOVQ, IPOPQ } &&
-	 E_dstM in { d_srcA, d_srcB } ||
+	(E_dstM in {d_srcB} || E_dstM in {d_srcA} && !(D_icode in {IRMMOVQ}))  ||
 	# Stalling at fetch while ret passes through pipeline
 	IRET in { D_icode, E_icode, M_icode };
+# E_dstM in { d_srcA, d_srcB }
+# 唯一的区别是当面对这条指令目的是内存的时候，我们不需要等待，因为我们可以直接从内存中读取数据
 
 # Should I stall or inject a bubble into Pipeline Register D?
 # At most one of these can be true.
 bool D_stall = 
 	# Conditions for a load/use hazard
 	E_icode in { IMRMOVQ, IPOPQ } &&
-	 E_dstM in { d_srcA, d_srcB };
+	 (E_dstM in {d_srcB} || E_dstM in {d_srcA} && !(D_icode in {IRMMOVQ}));
 
 bool D_bubble =
 	# Mispredicted branch
 	(E_icode == IJXX && !e_Cnd) ||
 	# Stalling at fetch while ret passes through pipeline
 	# but not condition for a load/use hazard
-	!(E_icode in { IMRMOVQ, IPOPQ } && E_dstM in { d_srcA, d_srcB }) &&
+	!(E_icode in { IMRMOVQ, IPOPQ } && (E_dstM in {d_srcB} || E_dstM in {d_srcA} && !(D_icode in {IRMMOVQ}))) &&
 	  IRET in { D_icode, E_icode, M_icode };
-
+# E_dstM in { d_srcA, d_srcB }
 # Should I stall or inject a bubble into Pipeline Register E?
 # At most one of these can be true.
 bool E_stall = 0;
@@ -361,7 +373,7 @@ bool E_bubble =
 	(E_icode == IJXX && !e_Cnd) ||
 	# Conditions for a load/use hazard
 	E_icode in { IMRMOVQ, IPOPQ } &&
-	 E_dstM in { d_srcA, d_srcB};
+	 (E_dstM in {d_srcB} || E_dstM in {d_srcA} && !(D_icode in {IRMMOVQ}));
 
 # Should I stall or inject a bubble into Pipeline Register M?
 # At most one of these can be true.

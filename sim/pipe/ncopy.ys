@@ -1,49 +1,161 @@
-#/* $begin ncopy-ys */
-##################################################################
-# ncopy.ys - Copy a src block of len words to dst.
-# Return the number of positive words (>0) contained in src.
-#
-# Include your name and ID here.
-#
-# Describe how and why you modified the baseline code.
-#
-##################################################################
-# Do not modify this portion
-# Function prologue.
-# %rdi = src, %rsi = dst, %rdx = len
+
+# 来自于一种教程宣称3的倍数，还有3分叉等抉择会更好
+# 我们先把所有的数据都9分组
+# 剩下的数据只能是0～8
+# 然后我们按照三岔来分就是第一次是0～2分一边，3分一边，4～8分一边
+# 然后6分一边，4～5分一边，7～8分一边
+# 猜测这样的效率会高一点
+# 然后还有就是不停的借用数据量少的循环的代码，这样就会好一点
+# 我猜测之前就是不能借用的原因导致效率不高，而且这里1的时候CPI=20比之前好多了
+# 所以我们要考虑把1给打下来
+
 ncopy:
+    # xor %rax, %rax
+    iaddq $-9, %rdx
+    jl lessThan9
 
-##################################################################
-# You can modify this portion
-	# Loop header
-	xorq %rax,%rax		# count = 0;
-	andq %rdx,%rdx		# len <= 0?
-	jle Done		# if so, goto Done:
+Loop9:
+    mrmovq (%rdi), %r8
+    mrmovq 8(%rdi), %r9
+    mrmovq 16(%rdi), %r10
+    mrmovq 24(%rdi), %r11
+    mrmovq 32(%rdi), %r12
+    mrmovq 40(%rdi), %r13
+    mrmovq 48(%rdi), %r14
+    mrmovq 56(%rdi), %rbx
+    mrmovq 64(%rdi), %rcx
+    rmmovq %r8, (%rsi)
+    rmmovq %r9, 8(%rsi)
+    rmmovq %r10, 16(%rsi)
+    rmmovq %r11, 24(%rsi)
+    rmmovq %r12, 32(%rsi)
+    rmmovq %r13, 40(%rsi)
+    rmmovq %r14, 48(%rsi)
+    rmmovq %rbx, 56(%rsi)
+    rmmovq %rcx, 64(%rsi)
+test9_1:
+    andq %r8, %r8
+    jle test9_2
+    iaddq $1, %rax
+test9_2:
+    andq %r9, %r9
+    jle test9_3
+    iaddq $1, %rax
+test9_3:
+    andq %r10, %r10
+    jle test9_4
+    iaddq $1, %rax
+test9_4:
+    andq %r11, %r11
+    jle test9_5
+    iaddq $1, %rax
+test9_5:
+    andq %r12, %r12
+    jle test9_6
+    iaddq $1, %rax
+test9_6:
+    andq %r13, %r13
+    jle test9_7
+    iaddq $1, %rax
+test9_7:
+    andq %r14, %r14
+    jle test9_8
+    iaddq $1, %rax
+test9_8:
+    andq %rbx, %rbx
+    jle test9_9
+    iaddq $1, %rax
+test9_9:
+    andq %rcx, %rcx
+    jle increment9
+    iaddq $1, %rax
+increment9:
+    iaddq $72, %rdi
+    iaddq $72, %rsi
+    iaddq $-9, %rdx
+    jge Loop9
 
-Loop:	mrmovq (%rdi), %r10	# read val from src...
-	rmmovq %r10, (%rsi)	# ...and store it to dst
-	andq %r10, %r10		# val <= 0?
-	jle Npos		# if so, goto Npos:
-	# irmovq $1, %r10
-	# addq %r10, %rax		# count++
-	iaddq $1, %rax		# count++, !modified the baseline code
-Npos:	
-	iaddq $-1, %rdx		# len--, !modified the baseline code
-	# irmovq $1, %r10
-	# subq %r10, %rdx		# len--
-	iaddq $8, %rdi		# src++, !modified the baseline code
-	iaddq $8, %rsi		# dst++, !modified the baseline code
-	# irmovq $8, %r10
-	# addq %r10, %rdi		# src++
-	# addq %r10, %rsi		# dst++
-	andq %rdx,%rdx		# len > 0?
-	jg Loop			# if so, goto Loop:
-##################################################################
-# Do not modify the following section of code
-# Function epilogue.
+lessThan9:
+    # 这里得到的%rdx = 原来的%rdx - 9 + 6 = 原来的%rdx - 3
+    iaddq $6, %rdx
+    jl lessThan3
+    jg moreThan3
+    je Loop3
+
+lessThan3:
+    # 这里得到的%rdx = 原来的%rdx - 3 + 2 = 原来的%rdx - 1
+    iaddq $2, %rdx
+    je Loop1 # 1所占的CPI太大了，让他可以尽可能被先照顾到
+    jg Loop2
+    ret # 剩下的绝对是0了，直接ret完全可以了
+
+Loop45:
+    # 底下没有地方放置了，所以我们把他们放在这里
+    iaddq $1, %rdx
+    jl Loop4
+    jmp Loop5
+
+moreThan3:
+    # 这里得到的%rdx = 原来的%rdx - 3 
+    # 原来的%rdx = 4 . 5 .6.7.8  -3 = 1 2 3 4 5
+    # 用3作为分界线所以我们这里还要再减3
+    iaddq $-3, %rdx
+    jl Loop45
+    je Loop6
+    # 接下来是判断到底是7 还是 8的代码
+    iaddq $-2, %rdx
+    jl Loop7
+    # 当运行到这里的时候，说明是8
+    # 我们直接和7连在一起只要上面+一点点就可以了
+    mrmovq 56(%rdi), %r8
+    rmmovq %r8, 56(%rsi)
+    andq %r8, %r8
+    jle Loop7
+    iaddq $1, %rax
+Loop7:
+    mrmovq 48(%rdi), %r8
+    # 我们判断7就加在Loop6上面
+    rmmovq %r8, 48(%rsi)
+    andq %r8, %r8
+    jle Loop6
+    iaddq $1, %rax
+Loop6:
+    mrmovq 40(%rdi), %r8
+    rmmovq %r8, 40(%rsi)
+    andq %r8, %r8
+    jle Loop5
+    iaddq $1, %rax
+Loop5:
+    mrmovq 32(%rdi), %r8
+    rmmovq %r8, 32(%rsi)
+    andq %r8, %r8
+    jle Loop4
+    iaddq $1, %rax
+Loop4:
+    mrmovq 24(%rdi), %r8
+    rmmovq %r8, 24(%rsi)
+    andq %r8, %r8
+    jle Loop3
+    iaddq $1, %rax
+Loop3:
+    mrmovq 16(%rdi), %r8
+    rmmovq %r8, 16(%rsi)
+    andq %r8, %r8
+    jle Loop2
+    iaddq $1, %rax
+Loop2:
+    mrmovq 8(%rdi), %r8
+    rmmovq %r8, 8(%rsi)
+    andq %r8, %r8
+    jle Loop1
+    iaddq $1, %rax
+Loop1:
+    mrmovq (%rdi), %r8
+    rmmovq %r8, (%rsi)
+    andq %r8, %r8
+    jle Done
+    iaddq $1, %rax
+
 Done:
-	ret
-##################################################################
-# Keep the following label at the end of your function
-End:
-#/* $end ncopy-ys */
+    ret
+

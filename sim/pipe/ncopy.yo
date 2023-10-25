@@ -1,3 +1,10 @@
+                            | # 吕杭州 2200013126
+                            | # 都换成iaddq指令后
+                            | # 我么要进行循环展开，我们展开8次，就是每次取8个数，然后进行判断，如果是正数就加1，然后再进行下一次循环
+                            | # 事实上应该mrmovq和rmmovq相邻的话会带来一些性能的损失
+                            | # 就是每次循环处理8个元素
+                            | # 这样之后在每个循环处理4个元素
+                            | 
                             | #/* $begin ncopy-ys */
                             | ##################################################################
                             | # ncopy.ys - Copy a src block of len words to dst.
@@ -16,34 +23,156 @@
                             | ##################################################################
                             | # You can modify this portion
                             | 	# Loop header
-0x000: 6300                 | 	xorq %rax,%rax		# count = 0;
-0x002: 6222                 | 	andq %rdx,%rdx		# len <= 0?
-0x004: 715f00000000000000   | 	jle Done		# if so, goto Done:
+                            | 	# xorq %rax,%rax		# count = 0;
+0x000: 6222                 | 	andq %rdx,%rdx		# len <= 0?
+0x002: 714703000000000000   | 	jle Done		# if so, goto Done:
+0x00b: 707001000000000000   | 	jmp check8		# 如果len大于0，那么就进行循环展开
                             | 
-0x00d: 50a70000000000000000 | Loop:	mrmovq (%rdi), %r10	# read val from src...
-0x017: 40a60000000000000000 | 	rmmovq %r10, (%rsi)	# ...and store it to dst
-0x021: 62aa                 | 	andq %r10, %r10		# val <= 0?
-0x023: 713600000000000000   | 	jle Npos		# if so, goto Npos:
+0x014:                      | Loop8:
+                            | # 这样避开了mrmovq和rmmovq相邻的问题
+0x014: 50370000000000000000 | 	mrmovq (%rdi), %rbx
+0x01e: 50170800000000000000 | 	mrmovq 8(%rdi), %rcx
+0x028: 50871000000000000000 | 	mrmovq 16(%rdi), %r8
+0x032: 50971800000000000000 | 	mrmovq 24(%rdi), %r9
+0x03c: 50a72000000000000000 | 	mrmovq 32(%rdi), %r10
+0x046: 50b72800000000000000 | 	mrmovq 40(%rdi), %r11
+0x050: 50c73000000000000000 | 	mrmovq 48(%rdi), %r12
+0x05a: 50d73800000000000000 | 	mrmovq 56(%rdi), %r13
+                            | 	
+0x064: 40360000000000000000 | 	rmmovq %rbx, (%rsi)
+0x06e: 40160800000000000000 | 	rmmovq %rcx, 8(%rsi)
+0x078: 40861000000000000000 | 	rmmovq %r8, 16(%rsi)
+0x082: 40961800000000000000 | 	rmmovq %r9, 24(%rsi)
+0x08c: 40a62000000000000000 | 	rmmovq %r10, 32(%rsi)
+0x096: 40b62800000000000000 | 	rmmovq %r11, 40(%rsi)
+0x0a0: 40c63000000000000000 | 	rmmovq %r12, 48(%rsi)
+0x0aa: 40d63800000000000000 | 	rmmovq %r13, 56(%rsi)
+                            | # 这里都是在判断我们是否可以让count++
+0x0b4:                      | test1:
+0x0b4: 6233                 | 	andq %rbx, %rbx
+0x0b6: 71c900000000000000   | 	jle test2
+0x0bf: c0f00100000000000000 | 	iaddq $1, %rax
+0x0c9:                      | test2:
+0x0c9: 6211                 | 	andq %rcx, %rcx
+0x0cb: 71de00000000000000   | 	jle test3
+0x0d4: c0f00100000000000000 | 	iaddq $1, %rax
+0x0de:                      | test3:
+0x0de: 6288                 | 	andq %r8, %r8
+0x0e0: 71f300000000000000   | 	jle test4
+0x0e9: c0f00100000000000000 | 	iaddq $1, %rax
+0x0f3:                      | test4:
+0x0f3: 6299                 | 	andq %r9, %r9
+0x0f5: 710801000000000000   | 	jle test5
+0x0fe: c0f00100000000000000 | 	iaddq $1, %rax
+0x108:                      | test5:
+0x108: 62aa                 | 	andq %r10, %r10
+0x10a: 711d01000000000000   | 	jle test6
+0x113: c0f00100000000000000 | 	iaddq $1, %rax
+0x11d:                      | test6:
+0x11d: 62bb                 | 	andq %r11, %r11
+0x11f: 713201000000000000   | 	jle test7
+0x128: c0f00100000000000000 | 	iaddq $1, %rax
+0x132:                      | test7:
+0x132: 62cc                 | 	andq %r12, %r12
+0x134: 714701000000000000   | 	jle test8
+0x13d: c0f00100000000000000 | 	iaddq $1, %rax
+0x147:                      | test8:
+0x147: 62dd                 | 	andq %r13, %r13
+0x149: 715c01000000000000   | 	jle increment8	# 如果这8个数检查过了，那么就进行下一次循环
+0x152: c0f00100000000000000 | 	iaddq $1, %rax
+0x15c:                      | increment8:
+0x15c: c0f74000000000000000 | 	iaddq $64, %rdi
+0x166: c0f64000000000000000 | 	iaddq $64, %rsi
+0x170:                      | check8:
+0x170: c0f2f8ffffffffffffff | 	iaddq $-8, %rdx
+0x17a: 761400000000000000   | 	jg Loop8
+0x183: c0f20800000000000000 | 	iaddq $8, %rdx 		# 但是减去8之后，长度比0小，说明剩下的不足8个，要进行单个的循环
+0x18d: 704e02000000000000   | 	jmp check4
+                            | # 然后我们可以展开为4 2 1
+0x196:                      | Loop4:
+0x196: 50370000000000000000 | 	mrmovq (%rdi), %rbx
+0x1a0: 50170800000000000000 | 	mrmovq 8(%rdi), %rcx
+0x1aa: 50871000000000000000 | 	mrmovq 16(%rdi), %r8
+0x1b4: 50971800000000000000 | 	mrmovq 24(%rdi), %r9
+                            | 	
+0x1be: 40360000000000000000 | 	rmmovq %rbx, (%rsi)
+0x1c8: 40160800000000000000 | 	rmmovq %rcx, 8(%rsi)
+0x1d2: 40861000000000000000 | 	rmmovq %r8, 16(%rsi)
+0x1dc: 40961800000000000000 | 	rmmovq %r9, 24(%rsi)
+                            | 
+0x1e6:                      | test1_4:
+0x1e6: 6233                 | 	andq %rbx, %rbx
+0x1e8: 71fb01000000000000   | 	jle test2_4
+0x1f1: c0f00100000000000000 | 	iaddq $1, %rax
+0x1fb:                      | test2_4:
+0x1fb: 6211                 | 	andq %rcx, %rcx
+0x1fd: 711002000000000000   | 	jle test3_4
+0x206: c0f00100000000000000 | 	iaddq $1, %rax
+0x210:                      | test3_4:
+0x210: 6288                 | 	andq %r8, %r8
+0x212: 712502000000000000   | 	jle test4_4
+0x21b: c0f00100000000000000 | 	iaddq $1, %rax
+0x225:                      | test4_4:
+0x225: 6299                 | 	andq %r9, %r9
+0x227: 713a02000000000000   | 	jle increment4
+0x230: c0f00100000000000000 | 	iaddq $1, %rax
+0x23a:                      | increment4:
+0x23a: c0f72000000000000000 | 	iaddq $32, %rdi
+0x244: c0f62000000000000000 | 	iaddq $32, %rsi
+0x24e:                      | check4:
+0x24e: c0f2fcffffffffffffff | 	iaddq $-4, %rdx
+0x258: 769601000000000000   | 	jg Loop4
+0x261: c0f20400000000000000 | 	iaddq $4, %rdx
+0x26b: 70da02000000000000   | 	jmp check2
+                            | 
+0x274:                      | Loop2:
+0x274: 50370000000000000000 | 	mrmovq (%rdi), %rbx
+0x27e: 50170800000000000000 | 	mrmovq 8(%rdi), %rcx
+                            | 	
+0x288: 40360000000000000000 | 	rmmovq %rbx, (%rsi)
+0x292: 40160800000000000000 | 	rmmovq %rcx, 8(%rsi)
+                            | 
+0x29c:                      | test1_2:
+0x29c: 6233                 | 	andq %rbx, %rbx
+0x29e: 71b102000000000000   | 	jle test2_2
+0x2a7: c0f00100000000000000 | 	iaddq $1, %rax
+0x2b1:                      | test2_2:
+0x2b1: 6211                 | 	andq %rcx, %rcx
+0x2b3: 71c602000000000000   | 	jle increment2
+0x2bc: c0f00100000000000000 | 	iaddq $1, %rax
+0x2c6:                      | increment2:
+0x2c6: c0f71000000000000000 | 	iaddq $16, %rdi
+0x2d0: c0f61000000000000000 | 	iaddq $16, %rsi
+0x2da:                      | check2:
+0x2da: c0f2feffffffffffffff | 	iaddq $-2, %rdx
+0x2e4: 767402000000000000   | 	jg Loop2
+0x2ed: c0f20200000000000000 | 	iaddq $2, %rdx
+                            | 
+0x2f7: 50a70000000000000000 | Loop:	mrmovq (%rdi), %r10	# read val from src...
+0x301: 40a60000000000000000 | 	rmmovq %r10, (%rsi)	# ...and store it to dst
+0x30b: 62aa                 | 	andq %r10, %r10		# val <= 0?
+0x30d: 712003000000000000   | 	jle Npos		# if so, goto Npos:
                             | 	# irmovq $1, %r10
                             | 	# addq %r10, %rax		# count++
-0x02c: c0f00100000000000000 | 	iaddq $1, %rax		# count++, !modified the baseline code
-0x036:                      | Npos:	
-0x036: c0f2ffffffffffffffff | 	iaddq $-1, %rdx		# len--, !modified the baseline code
+0x316: c0f00100000000000000 | 	iaddq $1, %rax		# count++, !modified the baseline code
+0x320:                      | Npos:	
+                            | 	
                             | 	# irmovq $1, %r10
                             | 	# subq %r10, %rdx		# len--
-0x040: c0f70800000000000000 | 	iaddq $8, %rdi		# src++, !modified the baseline code
-0x04a: c0f60800000000000000 | 	iaddq $8, %rsi		# dst++, !modified the baseline code
+0x320: c0f70800000000000000 | 	iaddq $8, %rdi		# src++, !modified the baseline code
+0x32a: c0f60800000000000000 | 	iaddq $8, %rsi		# dst++, !modified the baseline code
                             | 	# irmovq $8, %r10
                             | 	# addq %r10, %rdi		# src++
                             | 	# addq %r10, %rsi		# dst++
-0x054: 6222                 | 	andq %rdx,%rdx		# len > 0?
-0x056: 760d00000000000000   | 	jg Loop			# if so, goto Loop:
+0x334: c0f2ffffffffffffffff | 	iaddq $-1, %rdx		# len--, !modified the baseline code
+                            | 	# andq %rdx,%rdx		# len > 0?
+0x33e: 76f702000000000000   | 	jg Loop			# if so, goto Loop:
                             | ##################################################################
                             | # Do not modify the following section of code
                             | # Function epilogue.
-0x05f:                      | Done:
-0x05f: 90                   | 	ret
+0x347:                      | Done:
+0x347: 90                   | 	ret
                             | ##################################################################
-                            | # Keep the following label at the end of your function
-0x060:                      | End:
+                            | # Keep the following label at the end of your  function
+0x348:                      | End:
                             | #/* $end ncopy-ys */

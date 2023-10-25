@@ -1,4 +1,3 @@
-# 吕杭州 2200013126
 
 # steps of iaddq V,rB
 # fetch: icode:ifun = M1[PC], rA:rB = M1[PC+1], valC = M8[PC+2], valP = PC+10
